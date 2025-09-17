@@ -1,35 +1,42 @@
-// filepath: /home/silndoj/Core/IRC_42/server_commit2.cpp
-// Commit 2: feat: implement non-blocking I/O for scalable connections
+// filepath: /home/silndoj/Core/IRC_42/server_commit3.cpp
+// Commit 3: feat: add poll()-based event loop architecture
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <vector>
+#include <unordered_map>
 #include <errno.h>
+
+struct Client {
+    std::string write_buf;
+};
 
 int main()
 {
     // creating socket (IPv6)
-    int serverSocket = socket(AF_INET6, SOCK_STREAM, 0);
-    if (serverSocket == -1) {
+    int listen_fd = socket(AF_INET6, SOCK_STREAM, 0);
+    if (listen_fd == -1) {
         perror("socket");
         return 1;
     }
 
     // Set SO_REUSEADDR for quick server restart
     int opt = 1;
-    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         perror("setsockopt SO_REUSEADDR");
-        close(serverSocket);
+        close(listen_fd);
         return 1;
     }
 
     // Disable IPV6_V6ONLY to accept IPv4-mapped clients
     opt = 0;
-    if (setsockopt(serverSocket, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt)) == -1) {
+    if (setsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt)) == -1) {
         perror("setsockopt IPV6_V6ONLY");
-        close(serverSocket);
+        close(listen_fd);
         return 1;
     }
 
@@ -41,71 +48,71 @@ int main()
     serverAddress.sin6_addr = in6addr_any;
 
     // binding socket
-    if (bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
+    if (bind(listen_fd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
         perror("bind");
-        close(serverSocket);
+        close(listen_fd);
         return 1;
     }
 
     // listening to the assigned socket
-    if (listen(serverSocket, 5) == -1) {
+    if (listen(listen_fd, 5) == -1) {
         perror("listen");
-        close(serverSocket);
+        close(listen_fd);
         return 1;
     }
 
     // Make the listening socket non-blocking
-    int flags = fcntl(serverSocket, F_GETFL, 0);
+    int flags = fcntl(listen_fd, F_GETFL, 0);
     if (flags == -1) {
         perror("fcntl F_GETFL");
-        close(serverSocket);
+        close(listen_fd);
         return 1;
     }
-    if (fcntl(serverSocket, F_SETFL, flags | O_NONBLOCK) == -1) {
+    if (fcntl(listen_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
         perror("fcntl F_SETFL");
-        close(serverSocket);
+        close(listen_fd);
         return 1;
     }
 
-    std::cout << "Server listening on port 8080 (non-blocking)..." << std::endl;
+    // Create a pollfd list
+    std::vector<pollfd> pollfds;
+    pollfd listen_pfd = {listen_fd, POLLIN, 0};
+    pollfds.push_back(listen_pfd);
 
-    // accepting connection request (now non-blocking)
-    int clientSocket = accept(serverSocket, nullptr, nullptr);
-    if (clientSocket == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            std::cout << "No connection pending" << std::endl;
-        } else {
-            perror("accept");
+    // Prepare per-client storage
+    std::unordered_map<int, Client> clients;
+    std::unordered_map<int, size_t> fd_to_index;
+    fd_to_index[listen_fd] = 0;
+
+    std::cout << "Server listening on port 8080 with poll()..." << std::endl;
+
+    // Basic poll loop (simplified for this commit)
+    for (int i = 0; i < 3; ++i) {  // Just 3 iterations for demo
+        int poll_count = poll(pollfds.data(), pollfds.size(), 1000);  // 1 second timeout
+        if (poll_count == -1) {
+            perror("poll");
+            break;
+        } else if (poll_count == 0) {
+            std::cout << "Poll timeout, no events" << std::endl;
+            continue;
         }
-        close(serverSocket);
-        return 1;
-    }
 
-    // Set client socket non-blocking too
-    int client_flags = fcntl(clientSocket, F_GETFL, 0);
-    if (client_flags == -1 || fcntl(clientSocket, F_SETFL, client_flags | O_NONBLOCK) == -1) {
-        perror("fcntl client non-blocking");
-        close(clientSocket);
-        close(serverSocket);
-        return 1;
-    }
-
-    // receiving data (now non-blocking)
-    char buffer[1024] = { 0 };
-    ssize_t bytes_read = recv(clientSocket, buffer, sizeof(buffer), 0);
-    if (bytes_read > 0) {
-        std::cout << "Message from client " << clientSocket << " : " << buffer << std::endl;
-    } else if (bytes_read == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            std::cout << "No data available" << std::endl;
-        } else {
-            perror("recv");
+        // Check events
+        for (size_t j = 0; j < pollfds.size(); ++j) {
+            if (pollfds[j].revents & POLLIN) {
+                if (pollfds[j].fd == listen_fd) {
+                    std::cout << "New connection available" << std::endl;
+                    // Accept logic would go here in next commit
+                } else {
+                    std::cout << "Data available on client fd " << pollfds[j].fd << std::endl;
+                    // Client data handling would go here in next commit
+                }
+            }
         }
     }
 
-    // closing the sockets
-    close(clientSocket);
-    close(serverSocket);
+    // closing the socket
+    close(listen_fd);
 
     return 0;
 }
