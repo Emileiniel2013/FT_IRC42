@@ -1,5 +1,6 @@
-// filepath: /home/silndoj/Core/IRC_42/server_commit4.cpp
-// Commit 4: feat: implement multi-client echo server functionality
+// filepath: /home/silndoj/Core/IRC_42/server_commit5.cpp
+// Commit 5: feat: add robust connection lifecycle management
+// This is the final version with proper cleanup (same as current server.cpp)
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
@@ -18,14 +19,14 @@ struct Client {
 
 int main()
 {
-    // creating socket (IPv6)
+    // 1) Create listening socket (IPv6)
     int listen_fd = socket(AF_INET6, SOCK_STREAM, 0);
     if (listen_fd == -1) {
         perror("socket");
         return 1;
     }
 
-    // Set SO_REUSEADDR for quick server restart
+    // Set SO_REUSEADDR
     int opt = 1;
     if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         perror("setsockopt SO_REUSEADDR");
@@ -41,28 +42,27 @@ int main()
         return 1;
     }
 
-    // specifying the address (IPv6)
+    // Bind to in6addr_any
     sockaddr_in6 serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin6_family = AF_INET6;
     serverAddress.sin6_port = htons(8080);
     serverAddress.sin6_addr = in6addr_any;
 
-    // binding socket
     if (bind(listen_fd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
         perror("bind");
         close(listen_fd);
         return 1;
     }
 
-    // listening to the assigned socket
+    // Listen
     if (listen(listen_fd, 5) == -1) {
         perror("listen");
         close(listen_fd);
         return 1;
     }
 
-    // Make the listening socket non-blocking
+    // 2) Make the listening socket non-blocking
     int flags = fcntl(listen_fd, F_GETFL, 0);
     if (flags == -1) {
         perror("fcntl F_GETFL");
@@ -75,19 +75,19 @@ int main()
         return 1;
     }
 
-    // Create a pollfd list
+    // 3) Create a pollfd list
     std::vector<pollfd> pollfds;
     pollfd listen_pfd = {listen_fd, POLLIN, 0};
     pollfds.push_back(listen_pfd);
 
-    // Prepare per-client storage
+    // 4) Prepare per-client storage
     std::unordered_map<int, Client> clients;
     std::unordered_map<int, size_t> fd_to_index;
     fd_to_index[listen_fd] = 0;
 
-    std::cout << "Multi-client echo server listening on port 8080..." << std::endl;
+    std::cout << "Server listening on port 8080..." << std::endl;
 
-    // Main loop with echo functionality
+    // 5) Main loop with robust connection lifecycle management
     while (true) {
         int poll_count = poll(pollfds.data(), pollfds.size(), -1);
         if (poll_count == -1) {
@@ -97,6 +97,7 @@ int main()
 
         // Take a snapshot of returned pollfd entries
         std::vector<pollfd> snapshot = pollfds;
+        std::vector<int> fds_to_close;
 
         for (size_t i = 0; i < snapshot.size(); ++i) {
             int fd = snapshot[i].fd;
@@ -153,24 +154,23 @@ int main()
                                 pollfds[idx].events |= POLLOUT;
                             }
                         } else if (bytes_read == 0) {
-                            // Client closed connection (basic handling)
+                            // Client closed connection
                             std::cout << "Client " << fd << " disconnected" << std::endl;
-                            close(fd);
-                            // Note: Proper cleanup will be in next commit
-                            goto next_iteration;
+                            fds_to_close.push_back(fd);
+                            break;
                         } else {
                             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                                 break; // No more data to read
                             }
                             perror("recv");
-                            close(fd);
-                            goto next_iteration;
+                            fds_to_close.push_back(fd);
+                            break;
                         }
                     }
                 }
 
                 if (revents & POLLOUT) {
-                    // Send data to client (echo functionality)
+                    // Send data to client
                     Client& client = clients[fd];
                     if (!client.write_buf.empty()) {
                         ssize_t bytes_sent = send(fd, client.write_buf.c_str(), client.write_buf.size(), 0);
@@ -188,18 +188,45 @@ int main()
                         } else if (bytes_sent == -1) {
                             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                                 perror("send");
-                                close(fd);
+                                fds_to_close.push_back(fd);
                             }
                         }
                     }
                 }
+
+                if (revents & (POLLERR | POLLHUP)) {
+                    // Error or hangup
+                    std::cout << "Client " << fd << " error/hangup" << std::endl;
+                    fds_to_close.push_back(fd);
+                }
             }
         }
-        next_iteration:;
+
+        // Close scheduled file descriptors with proper cleanup
+        for (int fd : fds_to_close) {
+            close(fd);
+            clients.erase(fd);
+            
+            size_t idx = fd_to_index[fd];
+            fd_to_index.erase(fd);
+            
+            // Remove from pollfds vector
+            if (idx < pollfds.size()) {
+                pollfds.erase(pollfds.begin() + idx);
+                
+                // Update fd_to_index mapping for shifted elements
+                for (size_t i = idx; i < pollfds.size(); ++i) {
+                    fd_to_index[pollfds[i].fd] = i;
+                }
+            }
+        }
     }
 
-    // closing the socket
+    // 6) Close resources on server shutdown
     close(listen_fd);
+    for (auto& pair : clients) {
+        close(pair.first);
+    }
 
     return 0;
 }
