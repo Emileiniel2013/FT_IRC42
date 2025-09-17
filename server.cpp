@@ -1,5 +1,5 @@
-// filepath: /home/silndoj/Core/IRC_42/server_commit3.cpp
-// Commit 3: feat: add poll()-based event loop architecture
+// filepath: /home/silndoj/Core/IRC_42/server_commit4.cpp
+// Commit 4: feat: implement multi-client echo server functionality
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
@@ -9,6 +9,7 @@
 #include <poll.h>
 #include <vector>
 #include <unordered_map>
+#include <string>
 #include <errno.h>
 
 struct Client {
@@ -84,31 +85,117 @@ int main()
     std::unordered_map<int, size_t> fd_to_index;
     fd_to_index[listen_fd] = 0;
 
-    std::cout << "Server listening on port 8080 with poll()..." << std::endl;
+    std::cout << "Multi-client echo server listening on port 8080..." << std::endl;
 
-    // Basic poll loop (simplified for this commit)
-    for (int i = 0; i < 3; ++i) {  // Just 3 iterations for demo
-        int poll_count = poll(pollfds.data(), pollfds.size(), 1000);  // 1 second timeout
+    // Main loop with echo functionality
+    while (true) {
+        int poll_count = poll(pollfds.data(), pollfds.size(), -1);
         if (poll_count == -1) {
             perror("poll");
             break;
-        } else if (poll_count == 0) {
-            std::cout << "Poll timeout, no events" << std::endl;
-            continue;
         }
 
-        // Check events
-        for (size_t j = 0; j < pollfds.size(); ++j) {
-            if (pollfds[j].revents & POLLIN) {
-                if (pollfds[j].fd == listen_fd) {
-                    std::cout << "New connection available" << std::endl;
-                    // Accept logic would go here in next commit
-                } else {
-                    std::cout << "Data available on client fd " << pollfds[j].fd << std::endl;
-                    // Client data handling would go here in next commit
+        // Take a snapshot of returned pollfd entries
+        std::vector<pollfd> snapshot = pollfds;
+
+        for (size_t i = 0; i < snapshot.size(); ++i) {
+            int fd = snapshot[i].fd;
+            short revents = snapshot[i].revents;
+
+            if (fd == listen_fd && (revents & POLLIN)) {
+                // Accept new connections
+                while (true) {
+                    sockaddr_in6 clientAddr;
+                    socklen_t clientLen = sizeof(clientAddr);
+                    int client_fd = accept(listen_fd, (struct sockaddr*)&clientAddr, &clientLen);
+                    
+                    if (client_fd == -1) {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            break; // No more connections to accept
+                        }
+                        perror("accept");
+                        break;
+                    }
+
+                    // Set client socket non-blocking
+                    int client_flags = fcntl(client_fd, F_GETFL, 0);
+                    if (client_flags == -1 || fcntl(client_fd, F_SETFL, client_flags | O_NONBLOCK) == -1) {
+                        perror("fcntl client non-blocking");
+                        close(client_fd);
+                        continue;
+                    }
+
+                    // Add to pollfd vector
+                    pollfd client_pfd = {client_fd, POLLIN, 0};
+                    pollfds.push_back(client_pfd);
+                    fd_to_index[client_fd] = pollfds.size() - 1;
+
+                    // Add to client map
+                    clients[client_fd] = Client();
+
+                    std::cout << "New client connected: " << client_fd << std::endl;
+                }
+            } else if (fd != listen_fd) {
+                // Handle client events
+                if (revents & POLLIN) {
+                    // Read data from client
+                    char buffer[1024];
+                    while (true) {
+                        ssize_t bytes_read = recv(fd, buffer, sizeof(buffer) - 1, 0);
+                        
+                        if (bytes_read > 0) {
+                            buffer[bytes_read] = '\0';
+                            clients[fd].write_buf += buffer;
+                            
+                            // Set POLLOUT to echo data back
+                            size_t idx = fd_to_index[fd];
+                            if (idx < pollfds.size()) {
+                                pollfds[idx].events |= POLLOUT;
+                            }
+                        } else if (bytes_read == 0) {
+                            // Client closed connection (basic handling)
+                            std::cout << "Client " << fd << " disconnected" << std::endl;
+                            close(fd);
+                            // Note: Proper cleanup will be in next commit
+                            goto next_iteration;
+                        } else {
+                            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                break; // No more data to read
+                            }
+                            perror("recv");
+                            close(fd);
+                            goto next_iteration;
+                        }
+                    }
+                }
+
+                if (revents & POLLOUT) {
+                    // Send data to client (echo functionality)
+                    Client& client = clients[fd];
+                    if (!client.write_buf.empty()) {
+                        ssize_t bytes_sent = send(fd, client.write_buf.c_str(), client.write_buf.size(), 0);
+                        
+                        if (bytes_sent > 0) {
+                            client.write_buf.erase(0, bytes_sent);
+                            
+                            // If buffer is empty, clear POLLOUT flag
+                            if (client.write_buf.empty()) {
+                                size_t idx = fd_to_index[fd];
+                                if (idx < pollfds.size()) {
+                                    pollfds[idx].events &= ~POLLOUT;
+                                }
+                            }
+                        } else if (bytes_sent == -1) {
+                            if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                                perror("send");
+                                close(fd);
+                            }
+                        }
+                    }
                 }
             }
         }
+        next_iteration:;
     }
 
     // closing the socket
