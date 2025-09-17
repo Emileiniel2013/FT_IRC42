@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/14 19:03:44 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/15 19:04:34 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/17 17:56:48 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,6 +37,7 @@ public:
 	int						getId() const;
 	void					setId(int id);
 	const std::string&		getNick() const;
+	std::string				getReplyNick() const;
 	void					setNick(const std::string& nick);
 	const std::string&		getUser() const;
 	void					setUser(const std::string& user);

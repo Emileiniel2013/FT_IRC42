@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:57:21 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/15 19:45:21 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/17 17:57:48 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -48,6 +48,12 @@ int						Client::getId() const {return this->_id;}
 void					Client::setId(int id) {this->_id = id;}
 
 const	std::string&	Client::getNick() const {return this->_nick;}
+std::string				Client::getReplyNick() const {
+	if (!this->_nick.empty())
+		return this->_nick;
+	return "*";
+}
+
 void					Client::setNick(const std::string& nick) {this->_nick = nick;}
 
 void					Client::setUser(const std::string& user) {this->_user = user;}
