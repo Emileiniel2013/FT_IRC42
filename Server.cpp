@@ -6,12 +6,15 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 17:02:14 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/17 18:22:07 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/19 19:45:44 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
+#include "Utils.hpp"
 #include <sstream>
+#include <vector>
+#include <sys/socket.h>
 
 Server::Server(std::string name, std::string pass) : _serverName(name), _serverPass(pass) {
 	this->_cmdMap["PASS"] = &handlePass;
@@ -33,8 +36,8 @@ Server::Server(const Server& other) : _serverName(other._serverName), _serverPas
 
 Server&	Server::operator=(const Server& other) {
 	if (this != &other){
-		_serverName = other._serverName;
-		_serverPass = other._serverPass;
+		this->_serverName = other._serverName;
+		this->_serverPass = other._serverPass;
 		this->_cmdMap = other._cmdMap;
 	}
 	return *this;
@@ -42,7 +45,21 @@ Server&	Server::operator=(const Server& other) {
 
 Server::~Server() {}
 
-std::string	Server::processInput(Client& client, std::string& buf) 
+void		Server::registerUser(Client& client){
+	if (client.getAuth())
+		return ;
+	if (!client.getPassOk())
+		return ;
+	if (!client.getNickOk() || !client.getUserOk())
+		return ;
+	client.setAuth(true);
+	std::string	msg = ":" + _serverName + " 001 " + client.getNick() + " :WELCOME TO THE GREEN AVENGERS IRC NETWORK, "
+		+ client.getNick() + "!" + client.getUser() + "@" + _serverName + "\r\n";
+	send(client.getId(), msg.c_str(), msg.size(), 0);
+}
+
+
+void	Server::processInput(Client& client, std::string& buf) 
 {
 	std::string			cmd;
 	std::istringstream	keyword(buf);
@@ -50,59 +67,132 @@ std::string	Server::processInput(Client& client, std::string& buf)
 	keyword >> cmd;
 	auto	it = this->_cmdMap.find(cmd);
 	if (it != this->_cmdMap.end())
-		return (this->*(it->second))(client, keyword);
-	else
-		return ":" + this->_serverName + " 421 " + client.getReplyNick() + " " + cmd + " :Unknown command\r\n";
+		(this->*(it->second))(client, keyword);
+	else{
+		std::string msg = ":" + this->_serverName + " 421 " + client.getReplyNick() + " " + cmd + " :Unknown command\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+	}
 }
 
-std::string	Server::handlePass(Client& client, std::istringstream& in) {
+void	Server::handlePass(Client& client, std::istringstream& in) {
 	std::string	password;
 	in >> password;
+	std::string	msg;
 	
-	if (password.empty())
-		return ":" + this->_serverName + " 461 " + client.getReplyNick() + " PASS: Not enough parameters\r\n";
-	if (client.getAuth())
-		return ":" + this->_serverName + " 462 " + client.getReplyNick() + " :You might not reregister\r\n";
-	if (password != this->_serverPass)
-		return ":" + this->_serverName + " 464 " + client.getReplyNick() + " :Password incorrect\r\n";
-	client.setAuth(true);
-	return "";		// Here we need to see if this type of response that should just be ignored can mess with anything else or not
+	if (password.empty()){
+		msg = ":" + this->_serverName + " 461 " + client.getReplyNick() + " PASS: Not enough parameters\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	if (client.getAuth()){
+		msg = ":" + this->_serverName + " 462 " + client.getReplyNick() + " :You might not reregister\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	if (password != this->_serverPass){
+		msg = ":" + this->_serverName + " 464 " + client.getReplyNick() + " :Password incorrect\r\n"; //HERE WE NEED TO DISCONNECT USER
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	registerUser(client);
 }
 
-std::string	Server::handleNick(Client& client, std::istringstream& in) {
+void	Server::handleNick(Client& client, std::istringstream& in) {
 	std::string nickname;
 	in >> nickname;
+	std::string	msg;
 
-	if (nickname.empty())
-		return ":" + this->_serverName + " 461 " + client.getReplyNick() + " NICK: Not enough parameters\r\n";
+	if (nickname.empty()){
+		msg = ":" + this->_serverName + " 461 " + client.getReplyNick() + " NICK: Not enough parameters\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
 	for (auto it = _clients.begin(); it != _clients.end(); ++it){
-		if (it->second.getNick() == nickname)
-			return ":" + this->_serverName + " 433 * " + nickname + " :Nickname is already taken\r\n";
+		if (it->second.getNick() == nickname){
+			msg = ":" + this->_serverName + " 433 * " + nickname + " :Nickname is already taken\r\n";
+			send(client.getId(), msg.c_str(), msg.size(), 0);
+			return ;
+		}
 	}
 	client.setNick(nickname);
-	return "";		// Here the same story, stay updated for the next episode
+	registerUser(client);
 }
 
-std::string	Server::handleUser(Client& client, std::istringstream& in) {
-	
+void	Server::handleUser(Client& client, std::istringstream& in) {
+	std::string	username, hostname, servername, realname;
+	in >> username >> hostname >> servername;
+	std::getline(in, realname);
+	std::string	msg;
+	if (username.empty() || hostname.empty() || servername.empty() || realname.empty()){
+		msg = ":" + this->_serverName + " 461 " + client.getReplyNick() + " USER: Not enough parameters\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	if (client.getUser() != ""){
+		msg = ":" + this->_serverName + " 462 " + client.getReplyNick() + " :You might not reregister\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	realname.erase(0, 1);
+	client.setUser(username);
+	client.setName(realname);
+	registerUser(client);
 }
 
-std::string	Server::handleJoin(Client& client, std::istringstream& in) {return "";}
+void	Server::handleJoin(Client& client, std::istringstream& in) {
+	std::string	msg;
+	if (!client.getAuth()){
+		msg = ":" + this->_serverName + " 451 " + client.getReplyNick() + " :You have not registered\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
 
-std::string	Server::handlePrivmsg(Client& client, std::istringstream& in) {return "";}
+	std::string	chStr;
+	std::string	paswdStr;
+	in >> chStr;
+	if (chStr.empty()){
+		msg = ":" + this->_serverName + " 461 " + client.getReplyNick() + " JOIN: Not enough parameters\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	in >> paswdStr;
 
-std::string	Server::handlePing(Client& client, std::istringstream& in) {return "";}
+	std::vector<std::string>	channels = split(chStr, ',');
+	std::vector<std::string>	passwords = split(paswdStr, ',');
+	for (size_t i = 0; i < channels.size(); ++i){
+		std::string chName = channels[i];
+		if (_channels.count(chName) == 0){
+			_channels[chName] = Channel(chName);
+			_channels[chName].addOperator(client.getId());
+			client.addChannel(chName);
+			continue;
+		}
+		Channel& ch = _channels[chName];
+		if (!ch.getPass().empty() && (passwords.empty() || ch.getPass() != passwords.front())){
+			msg = ":" + this->_serverName + " 475 " + client.getReplyNick() + " " + chName + " :Cannot join channel (+k)\r\n";
+			send(client.getId(), msg.c_str(), msg.size(), 0);
+			if (!passwords.empty())
+				passwords.erase(passwords.begin());
+			continue;
+		}
+		//NEXT PART INVITEONLY CHECK, I JUST IMPLEMENTED AN INVITATION LIST TO USE HERE
+	}
+}
 
-std::string	Server::handlePong(Client& client, std::istringstream& in) {return "";}
+void	Server::handlePrivmsg(Client& client, std::istringstream& in) {}
 
-std::string	Server::handlePart(Client& client, std::istringstream& in) {return "";}
+void	Server::handlePing(Client& client, std::istringstream& in) {}
 
-std::string	Server::handleQuit(Client& client, std::istringstream& in) {return "";}
+void	Server::handlePong(Client& client, std::istringstream& in) {}
 
-std::string	Server::handleKick(Client& client, std::istringstream& in) {return "";}
+void	Server::handlePart(Client& client, std::istringstream& in) {}
 
-std::string	Server::handleInvite(Client& client, std::istringstream& in) {return "";}
+void	Server::handleQuit(Client& client, std::istringstream& in) {}
 
-std::string	Server::handleTopic(Client& client, std::istringstream& in) {return "";}
+void	Server::handleKick(Client& client, std::istringstream& in) {}
 
-std::string	Server::handleMode(Client& client, std::istringstream& in) {return "";}
+void	Server::handleInvite(Client& client, std::istringstream& in) {}
+
+void	Server::handleTopic(Client& client, std::istringstream& in) {}
+
+void	Server::handleMode(Client& client, std::istringstream& in) {}

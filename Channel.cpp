@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:58:19 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/16 12:36:48 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/19 19:45:00 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,6 +71,16 @@ void				Channel::removeOperator(int id) {
 bool				Channel::getInviteOnly() const {return this->_inviteOnly;}
 
 void				Channel::setInviteOnly(bool b) {this->_inviteOnly = b;}
+
+void				Channel::addInvite(int id) {_invited.insert(id);}
+
+bool				Channel::isInvited(int id) const {
+	if (_invited.count(id) > 0)
+		return true;
+	return false;
+}
+
+void				Channel::rmInvite(int id) {_invited.erase(id);}
 
 bool				Channel::getTopicRestrict() const {return this->_topicRestrict;}
 

@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:58:29 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/15 19:21:35 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/19 19:42:02 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,7 @@ private:
 	std::set<int>	_operators;
 	std::string		_topic;
 	bool			_inviteOnly = false;
+	std::set<int>	_invited;
 	bool			_topicRestrict = false;
 	std::string		_pass;
 	int				_userLimit = 0;
@@ -40,6 +41,9 @@ public:
 	void				removeOperator(int id);
 	bool				getInviteOnly() const;
 	void				setInviteOnly(bool b);
+	void				addInvite(int id);
+	bool				isInvited(int id) const;
+	void				rmInvite(int id);
 	bool				getTopicRestrict() const;
 	void				setTopicRestrict(bool b);
 	void				setPass(const std::string& pass);
