@@ -1,6 +1,3 @@
-// filepath: /home/silndoj/Core/IRC_42/server_commit5.cpp
-// Commit 5: feat: add robust connection lifecycle management
-// This is the final version with proper cleanup (same as current server.cpp)
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
@@ -15,7 +12,10 @@
 
 struct Client {
     std::string write_buf;
+    std::string _message;
 };
+
+// void    parse_str(std::string)
 
 int main()
 {
@@ -34,7 +34,7 @@ int main()
         return 1;
     }
 
-    // Disable IPV6_V6ONLY to accept IPv4-mapped clients
+    // Disable IPV6_V6ONLY to accept IPv4-mapped clients(opt 0 = disable)
     opt = 0;
     if (setsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt)) == -1) {
         perror("setsockopt IPV6_V6ONLY");
@@ -42,11 +42,11 @@ int main()
         return 1;
     }
 
-    // Bind to in6addr_any
+    // Bind to in6addr_any(listen every interface)
     sockaddr_in6 serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin6_family = AF_INET6;
-    serverAddress.sin6_port = htons(8080);
+    serverAddress.sin6_port = htons(6676);
     serverAddress.sin6_addr = in6addr_any;
 
     if (bind(listen_fd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
@@ -55,8 +55,8 @@ int main()
         return 1;
     }
 
-    // Listen
-    if (listen(listen_fd, 5) == -1) {
+    // Listen && SOMAXCONN its the core max capacity
+    if (listen(listen_fd, SOMAXCONN) == -1) {
         perror("listen");
         close(listen_fd);
         return 1;
@@ -87,7 +87,7 @@ int main()
 
     std::cout << "Server listening on port 8080..." << std::endl;
 
-    // 5) Main loop with robust connection lifecycle management
+    // 5) Main loop
     while (true) {
         int poll_count = poll(pollfds.data(), pollfds.size(), -1);
         if (poll_count == -1) {
@@ -136,30 +136,44 @@ int main()
 
                     std::cout << "New client connected: " << client_fd << std::endl;
                 }
-            } else if (fd != listen_fd) {
+            } 
+            
+            else if (fd != listen_fd) {
                 // Handle client events
                 if (revents & POLLIN) {
                     // Read data from client
-                    char buffer[1024];
-                    while (true) {
+                    while (true)
+                    {
+                        char buffer[1024];
                         ssize_t bytes_read = recv(fd, buffer, sizeof(buffer) - 1, 0);
-                        
-                        if (bytes_read > 0) {
-                            buffer[bytes_read] = '\0';
-                            clients[fd].write_buf += buffer;
-                            
-                            // Set POLLOUT to echo data back
-                            size_t idx = fd_to_index[fd];
-                            if (idx < pollfds.size()) {
-                                pollfds[idx].events |= POLLOUT;
+
+                        if (bytes_read > 0)
+                        {
+                            buffer[bytes_read] = '\0'; // make it C-string safe
+                            clients[fd].write_buf.append(buffer, bytes_read);
+
+                            size_t pos;
+                            // Process all complete messages in the buffer
+                            while ((pos = clients[fd].write_buf.find("\r\n")) != std::string::npos)
+                            {
+                                std::string message = clients[fd].write_buf.substr(0, pos);
+                                clients[fd].write_buf.erase(0, pos + 2);
+                                clients[fd]._message = message;
+                                // Display received message
+                                std::cout << "Message from client " << fd << ": " << clients[fd]._message << std::endl;
                             }
-                        } else if (bytes_read == 0) {
+                        }
+                        else if (bytes_read == 0)
+                        {
                             // Client closed connection
                             std::cout << "Client " << fd << " disconnected" << std::endl;
                             fds_to_close.push_back(fd);
                             break;
-                        } else {
-                            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        }
+                        else
+                        {
+                            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                            {
                                 break; // No more data to read
                             }
                             perror("recv");
@@ -172,14 +186,14 @@ int main()
                 if (revents & POLLOUT) {
                     // Send data to client
                     Client& client = clients[fd];
-                    if (!client.write_buf.empty()) {
-                        ssize_t bytes_sent = send(fd, client.write_buf.c_str(), client.write_buf.size(), 0);
+                    if (!client._message.empty()) {
+                        ssize_t bytes_sent = send(fd, client._message.c_str(), client._message.size(), 0);
                         
                         if (bytes_sent > 0) {
-                            client.write_buf.erase(0, bytes_sent);
+                            client._message.erase(0, bytes_sent);
                             
                             // If buffer is empty, clear POLLOUT flag
-                            if (client.write_buf.empty()) {
+                            if (client._message.empty()) {
                                 size_t idx = fd_to_index[fd];
                                 if (idx < pollfds.size()) {
                                     pollfds[idx].events &= ~POLLOUT;
@@ -202,7 +216,7 @@ int main()
             }
         }
 
-        // Close scheduled file descriptors with proper cleanup
+        // Close scheduled file descriptors
         for (int fd : fds_to_close) {
             close(fd);
             clients.erase(fd);
