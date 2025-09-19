@@ -161,6 +161,21 @@ int main()
                                 clients[fd]._message = message;
                                 // Display received message
                                 std::cout << "Message from client " << fd << ": " << clients[fd]._message << std::endl;
+                                for (auto &[other_fd, other_client] : clients)
+                                {
+                                    if (other_fd == fd)
+                                        continue; // skip the sender
+
+                                    // Append message to their send buffer
+                                    other_client._message = "Message from client " + std::to_string(fd) + ": " + message + "\r\n";
+
+                                    // Make sure POLLOUT is set so poll() will send
+                                    size_t idx = fd_to_index[other_fd];
+                                    if (idx < pollfds.size())
+                                    {
+                                        pollfds[idx].events |= POLLOUT;
+                                    }
+                                }
                             }
                         }
                         else if (bytes_read == 0)
@@ -186,10 +201,13 @@ int main()
                 if (revents & POLLOUT) {
                     // Send data to client
                     Client& client = clients[fd];
-                    if (!client._message.empty()) {
+                    
+                    if (!client._message.empty()) 
+                    {
                         ssize_t bytes_sent = send(fd, client._message.c_str(), client._message.size(), 0);
-                        
-                        if (bytes_sent > 0) {
+
+                        if (bytes_sent > 0)
+                        {
                             client._message.erase(0, bytes_sent);
                             
                             // If buffer is empty, clear POLLOUT flag
@@ -199,7 +217,9 @@ int main()
                                     pollfds[idx].events &= ~POLLOUT;
                                 }
                             }
-                        } else if (bytes_sent == -1) {
+                        }
+
+                        else if (bytes_sent == -1) {
                             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                                 perror("send");
                                 fds_to_close.push_back(fd);
