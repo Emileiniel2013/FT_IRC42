@@ -6,11 +6,12 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:58:19 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/19 19:45:00 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/20 16:04:32 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Channel.hpp"
+#include <vector>
 
 Channel::Channel(std::string name) : _name(name) {}
 
@@ -64,9 +65,24 @@ bool				Channel::isOperator(int id) const {
 	return this->_operators.find(id) != this->_operators.end();
 }
 
+std::vector<int>	Channel::getAllMembers() const{
+	std::vector<int>	members;
+	for (auto it = _members.begin(); it != _members.end(); ++it)
+		members.push_back(*it);
+	for (auto it = _operators.begin(); it != _operators.end(); ++it)
+		members.push_back(*it);
+	return members;
+}
+
+
 void				Channel::removeOperator(int id) {
 	this->_operators.erase(id);
 }
+
+std::string&		Channel::getTopic() {return this->_topic;}
+
+void				Channel::setTopic(const std::string& topic) {this->_topic = topic;}
+
 
 bool				Channel::getInviteOnly() const {return this->_inviteOnly;}
 
@@ -74,9 +90,11 @@ void				Channel::setInviteOnly(bool b) {this->_inviteOnly = b;}
 
 void				Channel::addInvite(int id) {_invited.insert(id);}
 
-bool				Channel::isInvited(int id) const {
-	if (_invited.count(id) > 0)
+bool				Channel::isInvited(int id) {
+	if (_invited.count(id) > 0){
+		rmInvite(id);
 		return true;
+	}
 	return false;
 }
 
@@ -93,3 +111,5 @@ const std::string&	Channel::getPass() const {return this->_pass;}
 void				Channel::setUserLimit(int limit) {this->_userLimit = limit;}
 
 int					Channel::getUserLimit() const {return this->_userLimit;}
+
+int					Channel::getUserCount() const {return static_cast<int>(this->_members.size() + this->_operators.size());}

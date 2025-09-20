@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 17:02:14 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/19 19:45:44 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/20 18:14:41 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,7 +45,55 @@ Server&	Server::operator=(const Server& other) {
 
 Server::~Server() {}
 
-void		Server::registerUser(Client& client){
+void	Server::broadcastJoin(Client& client, Channel& ch) {
+	std::string	msg = ":" + client.getNick() + "!~" + client.getUser() + "@" + this->_serverName +
+		" JOIN :" + ch.getName() + "\r\n";
+	for (int id : ch.getAllMembers()){
+		send(id, msg.c_str(), msg.size(), 0);
+	}
+}
+
+void	Server::sendTopic(Client& client, Channel& ch){
+	std::string	msg;
+	if (!ch.getTopic().empty()){
+		msg = ":" + this->_serverName + " 332 " + client.getReplyNick() +
+			" " + ch.getName() + " :" + ch.getTopic() + "\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+	}
+	else{
+		msg = ":" + this->_serverName + " 331 " + client.getReplyNick() +
+			" " + ch.getName() + " :No topic is set\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+	}
+}
+
+void	Server::sendNames(Client& client, Channel& ch){
+	std::string	namesList;
+	for (int id : ch.getAllMembers()){
+		Client&	member = _clients[id];
+		if (ch.isOperator(id))
+			namesList += "@";
+		namesList += member.getNick() + " ";
+	}
+	if (!namesList.empty())
+		namesList.pop_back();
+	std::string	msg = ":" + this->_serverName + " 353 " + client.getReplyNick() + 
+	" = " + ch.getName() + " :" + namesList + "\r\n";
+	send(client.getId(), msg.c_str(), msg.size(), 0);
+	msg = ":" + this->_serverName + " 366 " + client.getReplyNick() + 
+	" = " + ch.getName() + " :End of NAMES list\r\n";
+}
+
+void	Server::broadcastMessage(Client& sender, Channel& ch, const std::string message){
+	std::string	msg = ":" + sender.getNick() + "!~" + sender.getUser() + "@" + this->_serverName + 
+			" PRIVMSG " + ch.getName() + " :" + message + "\r\n";
+	for (int id : ch.getAllMembers())
+		send(id, msg.c_str(), msg.size(), 0);
+}
+
+
+
+void	Server::registerUser(Client& client){
 	if (client.getAuth())
 		return ;
 	if (!client.getPassOk())
@@ -53,7 +101,7 @@ void		Server::registerUser(Client& client){
 	if (!client.getNickOk() || !client.getUserOk())
 		return ;
 	client.setAuth(true);
-	std::string	msg = ":" + _serverName + " 001 " + client.getNick() + " :WELCOME TO THE GREEN AVENGERS IRC NETWORK, "
+	std::string	msg = ":" + this->_serverName + " 001 " + client.getNick() + " :WELCOME TO THE GREEN AVENGERS IRC NETWORK, "
 		+ client.getNick() + "!" + client.getUser() + "@" + _serverName + "\r\n";
 	send(client.getId(), msg.c_str(), msg.size(), 0);
 }
@@ -161,25 +209,96 @@ void	Server::handleJoin(Client& client, std::istringstream& in) {
 	std::vector<std::string>	passwords = split(paswdStr, ',');
 	for (size_t i = 0; i < channels.size(); ++i){
 		std::string chName = channels[i];
+		std::string	key;
+		if (!passwords.empty()){
+			key = passwords.front();
+			passwords.erase(passwords.begin());
+		}
 		if (_channels.count(chName) == 0){
 			_channels[chName] = Channel(chName);
 			_channels[chName].addOperator(client.getId());
 			client.addChannel(chName);
+			sendTopic(client, _channels[chName]);
+			sendNames(client, _channels[chName]);
 			continue;
 		}
 		Channel& ch = _channels[chName];
-		if (!ch.getPass().empty() && (passwords.empty() || ch.getPass() != passwords.front())){
+		if (!ch.getPass().empty() && (key.empty() || ch.getPass() != key)){
 			msg = ":" + this->_serverName + " 475 " + client.getReplyNick() + " " + chName + " :Cannot join channel (+k)\r\n";
 			send(client.getId(), msg.c_str(), msg.size(), 0);
-			if (!passwords.empty())
-				passwords.erase(passwords.begin());
 			continue;
 		}
-		//NEXT PART INVITEONLY CHECK, I JUST IMPLEMENTED AN INVITATION LIST TO USE HERE
+		if (ch.getInviteOnly() && !ch.isInvited(client.getId())){
+			msg = ":" + this->_serverName + " 473 " + client.getReplyNick() + " " + chName + " :Cannot join channel (+i)\r\n";
+			send(client.getId(), msg.c_str(), msg.size(), 0);
+			continue;
+		}
+		if (ch.getUserLimit() != 0 && ch.getUserCount() >= ch.getUserLimit()){
+			msg = ":" + this->_serverName + " 471 " + client.getReplyNick() + " " + chName + " :Cannot join channel (+l)\r\n";
+			send(client.getId(), msg.c_str(), msg.size(), 0);
+			continue;
+		}
+		ch.addMember(client.getId());
+		client.addChannel(chName);
+		broadcastJoin(client, ch);
+		sendTopic(client, ch);
+		sendNames(client, ch);
 	}
 }
 
-void	Server::handlePrivmsg(Client& client, std::istringstream& in) {}
+void	Server::handlePrivmsg(Client& client, std::istringstream& in) {
+	std::string	msg;
+	if (!client.getAuth()){
+		msg = ":" + this->_serverName + " 451 " + client.getReplyNick() + " :You have not registered\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	std::string	target;
+	in >> target;
+	std::string message;
+	std::getline(in, message);
+	if (!message.empty()){
+		if (message[0] == ' ')
+			message.erase(0, 1);
+		if (message[0] == ':')
+			message.erase(0, 1);
+	}
+	if (target.empty() || target[0] == ':'){
+		msg = ":" + this->_serverName + " 411 " + client.getReplyNick() + " :No recipient given (PRIVMSG)\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	if (message.empty()){
+		msg = ":" + this->_serverName + " 412 " + client.getReplyNick() + " :No text to send\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	if (target[0] == '#'){
+		if (_channels.count(target) == 0){
+			msg = ":" + this->_serverName + " 403 " + client.getReplyNick() + " " + target + " :No such channel\r\n";
+			send(client.getId(), msg.c_str(), msg.size(), 0);
+			return ;
+		}
+		broadcastMessage(client, _channels[target], message);
+	}else {
+		Client*	recipient = nullptr;
+		for (auto it = _clients.begin(); it != _clients.end(); ++it){
+			if (it->second.getNick() == target){
+				recipient = &it->second;
+				break ;
+			}
+		}
+		if (!recipient){
+			msg = ":" + this->_serverName + " 401 " + client.getReplyNick() + " " + target + " :No such nick\r\n";
+			send(client.getId(), msg.c_str(), msg.size(), 0);
+			return ;
+		}
+		msg = ":" + client.getNick() + "!~" + client.getUser() + "@" + this->_serverName + 
+			" PRIVMSG " + target + " :" + message + "\r\n";
+		send(recipient->getId(), msg.c_str(), msg.size(), 0);
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+	}
+}
 
 void	Server::handlePing(Client& client, std::istringstream& in) {}
 
@@ -191,7 +310,54 @@ void	Server::handleQuit(Client& client, std::istringstream& in) {}
 
 void	Server::handleKick(Client& client, std::istringstream& in) {}
 
-void	Server::handleInvite(Client& client, std::istringstream& in) {}
+void	Server::handleInvite(Client& client, std::istringstream& in) {
+	std::string	msg;
+	if (!client.getAuth()){
+		msg = ":" + this->_serverName + " 451 " + client.getReplyNick() 
+			+ " :You have not registered\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	std::string	targetName, chName;
+	in >> targetName >> chName;
+	if (targetName.empty() || chName.empty()){
+		msg = ":" + this->_serverName + " 461 " + client.getReplyNick() 
+			+ " INVITE:Not enough parameters\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	if (_channels.count(chName) == 0){
+		msg = ":" + this->_serverName + " 403 " + client.getReplyNick() + " " 
+			+ chName + " :No such channel\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	Channel&	ch = _channels[chName];
+	if (!ch.isOperator(client.getId())){
+		msg = ":" + this->_serverName + " 482 " + client.getReplyNick() + " " 
+			+ chName + " :You're not channel operator\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	Client*	target = nullptr;
+	for (auto it = _clients.begin(); it != _clients.end(); ++it){
+		if (it->second.getNick() == targetName){
+			target = &it->second;
+			break ;
+		}
+	}
+	if (!target){
+		msg = ":" + this->_serverName + " 401 " + client.getReplyNick() + " " + 
+			targetName + " :No such nick\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;		
+	}
+	if (ch.getInviteOnly())
+		ch.addInvite(target->getId());
+	msg = ":" + client.getNick() + "!~" + client.getUser() + "@" + this->_serverName + 
+		" INVITE " + targetName + " :" + chName + "\r\n";
+	send(target->getId(), msg.c_str(), msg.size(), 0);
+}
 
 void	Server::handleTopic(Client& client, std::istringstream& in) {}
 

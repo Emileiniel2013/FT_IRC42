@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:58:29 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/19 19:42:02 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/20 15:56:13 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,11 +38,14 @@ public:
 	void				removeMember(int id);
 	void				addOperator(int id);
 	bool				isOperator(int id) const;
+	std::vector<int>	getAllMembers() const;
 	void				removeOperator(int id);
+	std::string&		getTopic();
+	void				setTopic(const std::string& topic);
 	bool				getInviteOnly() const;
 	void				setInviteOnly(bool b);
 	void				addInvite(int id);
-	bool				isInvited(int id) const;
+	bool				isInvited(int id);
 	void				rmInvite(int id);
 	bool				getTopicRestrict() const;
 	void				setTopicRestrict(bool b);
@@ -50,4 +53,5 @@ public:
 	const std::string&	getPass() const;
 	void				setUserLimit(int limit);
 	int					getUserLimit() const;
+	int					getUserCount() const;
 };

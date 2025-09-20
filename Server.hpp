@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 17:01:07 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/19 19:01:45 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/20 15:53:36 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,6 +37,10 @@ private:
 	std::string								_serverPass;
 
 	void	registerUser(Client& client);
+	void	broadcastJoin(Client& client, Channel& ch);
+	void	sendTopic(Client& client, Channel& ch);
+	void	sendNames(Client& client, Channel& ch);
+	void	broadcastMessage(Client& sender, Channel& ch, const std::string message);
 	void	handlePass(Client& client, std::istringstream& str);
 	void	handleNick(Client& client, std::istringstream& str);
 	void	handleUser(Client& client, std::istringstream& str);
