@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:58:19 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/20 16:04:32 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/21 15:25:27 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -50,7 +50,8 @@ void				Channel::addMember(int id) {
 }
 
 bool				Channel::isMember(int id) const {
-	return this->_members.find(id) != this->_members.end();
+	return this->_members.find(id) != this->_members.end() ||
+		this->_operators.find(id) != this->_operators.end();
 }
 
 void				Channel::removeMember(int id) {

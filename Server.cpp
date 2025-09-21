@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 17:02:14 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/20 18:14:41 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/21 15:50:17 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -151,7 +151,7 @@ void	Server::handleNick(Client& client, std::istringstream& in) {
 	std::string	msg;
 
 	if (nickname.empty()){
-		msg = ":" + this->_serverName + " 461 " + client.getReplyNick() + " NICK: Not enough parameters\r\n";
+		msg = ":" + this->_serverName + " 461 " + client.getReplyNick() + " NICK: Not enough parameter && !_channels[chName].isOperator(client.getId())s\r\n";
 		send(client.getId(), msg.c_str(), msg.size(), 0);
 		return ;
 	}
@@ -279,6 +279,11 @@ void	Server::handlePrivmsg(Client& client, std::istringstream& in) {
 			send(client.getId(), msg.c_str(), msg.size(), 0);
 			return ;
 		}
+		if (!_channels[target].isMember(client.getId())){
+			msg = ":" + this->_serverName + " 442 " + client.getReplyNick() + " " + target + " :You're not on that channel\r\n";
+			send(client.getId(), msg.c_str(), msg.size(), 0);
+			return ;
+		}
 		broadcastMessage(client, _channels[target], message);
 	}else {
 		Client*	recipient = nullptr;
@@ -359,6 +364,46 @@ void	Server::handleInvite(Client& client, std::istringstream& in) {
 	send(target->getId(), msg.c_str(), msg.size(), 0);
 }
 
-void	Server::handleTopic(Client& client, std::istringstream& in) {}
+void	Server::handleTopic(Client& client, std::istringstream& in) {
+	std::string	msg;
+	if (!client.getAuth()){
+		msg = ":" + this->_serverName + " 451 " + client.getReplyNick() 
+			+ " :You have not registered\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	std::string	chName, topic;
+	in >> chName >> topic;
+	if (chName.empty()){
+		msg = ":" + this->_serverName + " 461 " + client.getReplyNick() 
+			+ " TOPIC:Not enough parameters\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	if (_channels.count(chName) == 0){
+		msg = ":" + this->_serverName + " 403 " + client.getReplyNick() + " " 
+			+ chName + " :No such channel\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	if (!_channels[chName].isMember(client.getId())){
+		msg = ":" + this->_serverName + " 442 " + client.getReplyNick() + " " 
+			+ chName + " :You're not on that channel\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+	if (topic.empty()){
+		if (_channels[chName].getTopic().empty()){
+			msg = ":" + this->_serverName + " 331 " + client.getReplyNick() + " " 
+				+ chName + " :No topic is set\r\n";
+			send(client.getId(), msg.c_str(), msg.size(), 0);
+			return ;
+		}
+		msg = ":" + this->_serverName + " 332 " + client.getReplyNick() + " " 
+			+ chName + " :" + _channels[chName].getTopic() + "\r\n";
+		send(client.getId(), msg.c_str(), msg.size(), 0);
+		return ;
+	}
+}
 
 void	Server::handleMode(Client& client, std::istringstream& in) {}
