@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:57:21 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/19 19:03:17 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/21 19:49:55 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -53,6 +53,10 @@ std::string				Client::getReplyNick() const {
 	if (!this->_nick.empty())
 		return this->_nick;
 	return "*";
+}
+
+std::string				Client::getPrefix() const {
+	return getNick() + "!~" + getUser() + "@";
 }
 
 void					Client::setNick(const std::string& nick) {this->_nick = nick;}

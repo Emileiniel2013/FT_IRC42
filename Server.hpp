@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 17:01:07 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/20 15:53:36 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/22 16:14:15 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,18 +29,21 @@ public:
 
 	void	processInput(Client& client, std::string& buf);
 private:
-	const int	AUTH_TIMEOUT = 60;
-	const int	PING_TIMEOUT = 120;
-	const int	PING_WAITIME = 30;
 	std::map<std::string, CommandHandler>	_cmdMap;
 	std::string								_serverName;
 	std::string								_serverPass;
 
+	void	createChannel(Client& creator, const std::string& chName);
 	void	registerUser(Client& client);
 	void	broadcastJoin(Client& client, Channel& ch);
 	void	sendTopic(Client& client, Channel& ch);
 	void	sendNames(Client& client, Channel& ch);
 	void	broadcastMessage(Client& sender, Channel& ch, const std::string message);
+	bool	isInChannel(const std::string& target, Channel& ch);
+	bool	isOnServer(const std::string& target);
+	int		getIdFromNick(const std::string& target);
+	void	sendError(Client& client, int errCode, const std::string& target, const std::string& text);
+	// void	sendReply(Client& client, int errCode, const std::string& target, const std::string& text);
 	void	handlePass(Client& client, std::istringstream& str);
 	void	handleNick(Client& client, std::istringstream& str);
 	void	handleUser(Client& client, std::istringstream& str);
