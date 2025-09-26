@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 17:01:07 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/26 12:20:50 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/26 14:49:25 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,7 +38,7 @@ private:
 	void	broadcastJoin(Client& client, Channel& ch);
 	void	sendTopic(Client& client, Channel& ch);
 	void	sendNames(Client& client, Channel& ch);
-	void	broadcastMessage(Client& sender, Channel& ch, const std::string message);
+	void	broadcastMessage(Client& sender, Channel& ch, const std::string& message);
 	bool	isInChannel(const std::string& target, Channel& ch);
 	bool	isOnServer(const std::string& target);
 	int		getIdFromNick(const std::string& target);
