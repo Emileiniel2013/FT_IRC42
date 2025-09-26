@@ -6,14 +6,14 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:57:21 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/21 19:49:55 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/26 14:00:13 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Client.hpp"
 #include <time.h>
 
-Client::Client(int id) : _id(id) {_lastInput = time(nullptr);}
+Client::Client(int id) : _id(id) {}
 
 Client::Client(const Client& other) {
 	_id = other._id;
@@ -22,8 +22,6 @@ Client::Client(const Client& other) {
 	_name = other._name;
 	_channels = other._channels;
 	_authenticated = other._authenticated;
-	_lastInput = other._lastInput;
-	_ping = other._ping;
 	_inputBuf = other._inputBuf;
 }
 
@@ -35,8 +33,6 @@ Client&	Client::operator=(const Client& other){
 		_name = other._name;
 		_channels = other._channels;
 		_authenticated = other._authenticated;
-		_lastInput = other._lastInput;
-		_ping = other._ping;
 		_inputBuf = other._inputBuf;
 	}
 	return *this;
@@ -67,6 +63,10 @@ const 	std::string&	Client::getUser() const {return this->_user;}
 const std::string&		Client::getName() const {return this->_name;}
 void					Client::setName(const std::string& name) {this->_name = name;}
 
+std::set<std::string>	Client::getChannels() const {return this->_channels;}
+void					Client::addChannel(const std::string& channel) {this->_channels.insert(channel);}
+void					Client::remChannel(const std::string& channel){this->_channels.erase(channel);}
+
 bool					Client::getPassOk() const {return this->_passOk;}
 void					Client::setPassOk(bool b) {this->_passOk = b;}
 bool					Client::getNickOk() const {return this->_nickOk;}
@@ -77,30 +77,6 @@ bool					Client::getAuth() const {return this->_authenticated;}
 void					Client::setAuth(bool b){
 	this->_authenticated = b;
 }
-
-
-bool					Client::isInChannel(const std::string& channel) const {
-	return this->_channels.find(channel) != this->_channels.end();
-}
-
-void					Client::addChannel(const std::string& channel) {
-	this->_channels.insert(channel);
-}
-
-void					Client::removeChannel(const std::string& channel){
-	this->_channels.erase(channel);
-}
-
-time_t					Client::getLastInput() const {return this->_lastInput;}
-void					Client::setLastInput(){
-	this->_lastInput = time(nullptr);
-}
-
-bool					Client::getPing() const {return this->_ping;}
-void					Client::setPing(bool b){
-	this->_ping = b;
-}
-
 
 std::string&			Client::getInputBuf() {return this->_inputBuf;}
 

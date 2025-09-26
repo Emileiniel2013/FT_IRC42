@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:58:29 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/20 15:56:13 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/22 21:13:11 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,4 +54,5 @@ public:
 	void				setUserLimit(int limit);
 	int					getUserLimit() const;
 	int					getUserCount() const;
+	void				broadcast(const std::string& message) const;
 };

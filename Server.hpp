@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 17:01:07 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/22 16:14:15 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/26 12:20:50 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -43,7 +43,6 @@ private:
 	bool	isOnServer(const std::string& target);
 	int		getIdFromNick(const std::string& target);
 	void	sendError(Client& client, int errCode, const std::string& target, const std::string& text);
-	// void	sendReply(Client& client, int errCode, const std::string& target, const std::string& text);
 	void	handlePass(Client& client, std::istringstream& str);
 	void	handleNick(Client& client, std::istringstream& str);
 	void	handleUser(Client& client, std::istringstream& str);

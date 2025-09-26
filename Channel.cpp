@@ -6,12 +6,13 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:58:19 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/21 15:25:27 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/22 21:13:26 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Channel.hpp"
 #include <vector>
+#include <sys/socket.h>
 
 Channel::Channel(std::string name) : _name(name) {}
 
@@ -114,3 +115,9 @@ void				Channel::setUserLimit(int limit) {this->_userLimit = limit;}
 int					Channel::getUserLimit() const {return this->_userLimit;}
 
 int					Channel::getUserCount() const {return static_cast<int>(this->_members.size() + this->_operators.size());}
+
+void				Channel::broadcast(const std::string& message) const{
+	for (int id : this->getAllMembers()){
+		send(id, message.c_str(), message.size(), 0);
+	}
+}
