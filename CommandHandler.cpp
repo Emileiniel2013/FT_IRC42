@@ -32,6 +32,7 @@ void	Server::handlePass(Client& client, std::istringstream& in) {
 	}
 	if (password != this->_serverPass){
 		sendError(client, ERR_PASSWDMISMATCH, "", "Password incorrect"); //HERE WE NEED TO DISCONNECT USER
+		_clients.erase(client.getId());
 		return ;
 	}
 	registerUser(client);

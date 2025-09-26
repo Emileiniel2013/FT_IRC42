@@ -13,6 +13,9 @@
 #pragma once
 #include "Channel.hpp"
 #include "Client.hpp"
+#include <vector>
+#include <unordered_map>
+#include <poll.h>
 
 class	Server{
 public:
@@ -28,10 +31,15 @@ public:
 	~Server();
 
 	void	processInput(Client& client, std::string& buf);
+	void	startServer();
 private:
 	std::map<std::string, CommandHandler>	_cmdMap;
 	std::string								_serverName;
 	std::string								_serverPass;
+	int										_listenFd;
+	std::vector<pollfd>						_pollfds;
+	std::unordered_map<int, size_t>			_fdToIndex;
+
 
 	void	createChannel(Client& creator, const std::string& chName);
 	void	registerUser(Client& client);
@@ -43,6 +51,12 @@ private:
 	bool	isOnServer(const std::string& target);
 	int		getIdFromNick(const std::string& target);
 	void	sendError(Client& client, int errCode, const std::string& target, const std::string& text);
+	void	setupSocket();
+	void	acceptNewClients();
+	void	handleClientInput(int fd, size_t index);
+	void	handleClientOutput(int fd, size_t index);
+	void	cleanupClient(int fd);
+	void	sendBroadcast(int senderFd, const std::string& message);
 	void	handlePass(Client& client, std::istringstream& str);
 	void	handleNick(Client& client, std::istringstream& str);
 	void	handleUser(Client& client, std::istringstream& str);
