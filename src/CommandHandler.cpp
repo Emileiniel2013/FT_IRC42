@@ -35,6 +35,7 @@ void	Server::handlePass(Client& client, std::istringstream& in) {
 		_clients.erase(client.getId());
 		return ;
 	}
+	client.setPassOk(true);
 	registerUser(client);
 }
 
@@ -51,6 +52,7 @@ void	Server::handleNick(Client& client, std::istringstream& in) {
 		return ;
 	}
 	client.setNick(nickname);
+	client.setNickOk(true);
 	registerUser(client);
 }
 
@@ -58,6 +60,7 @@ void	Server::handleUser(Client& client, std::istringstream& in) {
 	std::string	username, hostname, servername, realname;
 	in >> username >> hostname >> servername;
 	std::getline(in, realname);
+	trimPrefix(realname);
 	if (username.empty() || hostname.empty() || servername.empty() || realname.empty()){
 		sendError(client, ERR_NEEDMOREPARAMS, "USER", "Not enough parameters");
 		return ;
@@ -66,9 +69,9 @@ void	Server::handleUser(Client& client, std::istringstream& in) {
 		sendError(client, ERR_ALREADYREGISTRED, "", "You might not reregister");
 		return ;
 	}
-	realname.erase(0, 1);
 	client.setUser(username);
 	client.setName(realname);
+	client.setUserOk(true);
 	registerUser(client);
 }
 
@@ -85,10 +88,13 @@ void	Server::handleJoin(Client& client, std::istringstream& in) {
 	std::vector<std::string>	passwords = split(paswdStr, ',');
 	for (size_t i = 0; i < channels.size(); ++i){
 		std::string chName = channels[i];
+		if (chName.empty() || chName[0] != '#'){
+			sendError(client, ERR_NOSUCHCHANNEL, chName, "No such channel");
+			continue;
+		}
 		std::string	key;
-		if (!passwords.empty()){
-			key = passwords.front();
-			passwords.erase(passwords.begin());
+		if (i < passwords.size()){
+			key = passwords[i];
 		}
 		if (_channels.count(chName) == 0){
 			createChannel(client, chName);
@@ -144,10 +150,9 @@ void	Server::handlePrivmsg(Client& client, std::istringstream& in) {
 			sendError(client, ERR_NOSUCHNICK, target, "No such nick");
 			return ;
 		}
-		std::string	msg = ":" + client.getPrefix() + this->_serverName + 
+		std::string	msg = ":" + client.getPrefix() + 
 			" PRIVMSG " + target + " :" + message + "\r\n";
 		send(getIdFromNick(target), msg.c_str(), msg.size(), 0);
-		send(client.getId(), msg.c_str(), msg.size(), 0);
 	}
 }
 
@@ -323,7 +328,7 @@ void	Server::handleTopic(Client& client, std::istringstream& in) {
 		return ;
 	}
 	ch.setTopic(topic);
-	std::string	msg = ":" + client.getPrefix() + _serverName + 
+	std::string	msg = ":" + client.getPrefix() + 
 		" TOPIC " + chName + " :" + topic + "\r\n";
 	ch.broadcast(msg);
 }
@@ -373,6 +378,7 @@ void	Server::handleMode(Client& client, std::istringstream& in) {
 				ch.setPass("");
 			break ;
 		case 'o':
+		{
 			if (param.empty()){
 					sendError(client, ERR_NEEDMOREPARAMS, "MODE", "Missing nick parameter");
 					return ;				
@@ -394,6 +400,7 @@ void	Server::handleMode(Client& client, std::istringstream& in) {
 				ch.addMember(id);
 			}
 			break ;
+		}
 		case 'l':
 			if (sign == '+'){
 				if (param.empty()){
@@ -417,8 +424,9 @@ void	Server::handleMode(Client& client, std::istringstream& in) {
 			sendError(client, ERR_UNKNOWNMODE, std::string(1, cmd), "Unknown mode char");
 			return ;
 	}
-	std::string	msg = ":" + client.getPrefix() + _serverName + " MODE " + chName + " " + mode;
+	std::string	msg = ":" + client.getPrefix() + " MODE " + chName + " " + mode;
 	if (!param.empty())
 		msg += " " + param;
+	msg += "\r\n";
 	ch.broadcast(msg);
 }

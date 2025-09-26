@@ -37,13 +37,14 @@ void	Server::createChannel(Client& creator, const std::string& chName){
 	_channels[chName] = Channel(chName);
 	_channels[chName].addOperator(creator.getId());
 	creator.addChannel(chName);
+	broadcastJoin(creator, _channels[chName]);
 	sendTopic(creator, _channels[chName]);
 	sendNames(creator, _channels[chName]);
 }
 
 
 void	Server::broadcastJoin(Client& client, Channel& ch) {
-	std::string	msg = ":" + client.getPrefix() + this->_serverName +
+	std::string	msg = ":" + client.getPrefix() +
 		" JOIN :" + ch.getName() + "\r\n";
 	ch.broadcast(msg);
 }
@@ -81,7 +82,7 @@ void	Server::sendNames(Client& client, Channel& ch){
 }
 
 void	Server::broadcastMessage(Client& sender, Channel& ch, const std::string& message){
-	std::string	msg = ":" + sender.getPrefix() + this->_serverName + 
+	std::string	msg = ":" + sender.getPrefix() + 
 			" PRIVMSG " + ch.getName() + " :" + message + "\r\n";
 	for (int id : ch.getAllMembers()){
 		if (id != sender.getId())

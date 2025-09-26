@@ -13,6 +13,8 @@
 #include "Client.hpp"
 #include <time.h>
 
+Client::Client() : _id(-1) {}
+
 Client::Client(int id) : _id(id) {}
 
 Client::Client(const Client& other) {

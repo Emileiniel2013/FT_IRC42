@@ -14,6 +14,8 @@
 #include <vector>
 #include <sys/socket.h>
 
+Channel::Channel() : _name("") {}
+
 Channel::Channel(std::string name) : _name(name) {}
 
 Channel::Channel(const Channel& other) {

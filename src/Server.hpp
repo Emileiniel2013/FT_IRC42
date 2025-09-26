@@ -25,7 +25,7 @@ public:
 	);
 	std::map<int, Client>					_clients;
 	std::map<std::string, Channel>			_channels;
-	Server(std::string name, std::string pass);
+	Server(std::string name, std::string pass, int port);
 	Server(const Server& other);
 	Server&	operator=(const Server& other);
 	~Server();
@@ -36,6 +36,7 @@ private:
 	std::map<std::string, CommandHandler>	_cmdMap;
 	std::string								_serverName;
 	std::string								_serverPass;
+	int										_port;
 	int										_listenFd;
 	std::vector<pollfd>						_pollfds;
 	std::unordered_map<int, size_t>			_fdToIndex;

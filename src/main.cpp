@@ -21,7 +21,8 @@ int main(int argc, char** argv) {
     }
 
     try {
-        Server server("IRCServer", argv[2]);
+        int port = std::stoi(argv[1]);
+        Server server("IRCServer", argv[2], port);
         server.startServer();
     } catch (const std::exception& e) {
         std::cerr << "Server error: " << e.what() << std::endl;

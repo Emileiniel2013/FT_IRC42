@@ -24,22 +24,22 @@
 #include <iostream>
 #include <errno.h>
 
-Server::Server(std::string name, std::string pass) : _serverName(name), _serverPass(pass), _listenFd(-1) {
-	this->_cmdMap["PASS"] = &handlePass;
-	this->_cmdMap["NICK"] = &handleNick;
-	this->_cmdMap["USER"] = &handleUser;
-	this->_cmdMap["JOIN"] = &handleJoin;
-	this->_cmdMap["PRIVMSG"] = &handlePrivmsg;
-	this->_cmdMap["PING"] = &handlePing;
-	this->_cmdMap["PART"] = &handlePart;
-	this->_cmdMap["QUIT"] = &handleQuit;
-	this->_cmdMap["KICK"] = &handleKick;
-	this->_cmdMap["INVITE"] = &handleInvite;
-	this->_cmdMap["TOPIC"] = &handleTopic;
-	this->_cmdMap["MODE"] = &handleMode;
+Server::Server(std::string name, std::string pass, int port) : _serverName(name), _serverPass(pass), _port(port), _listenFd(-1) {
+	this->_cmdMap["PASS"] = &Server::handlePass;
+	this->_cmdMap["NICK"] = &Server::handleNick;
+	this->_cmdMap["USER"] = &Server::handleUser;
+	this->_cmdMap["JOIN"] = &Server::handleJoin;
+	this->_cmdMap["PRIVMSG"] = &Server::handlePrivmsg;
+	this->_cmdMap["PING"] = &Server::handlePing;
+	this->_cmdMap["PART"] = &Server::handlePart;
+	this->_cmdMap["QUIT"] = &Server::handleQuit;
+	this->_cmdMap["KICK"] = &Server::handleKick;
+	this->_cmdMap["INVITE"] = &Server::handleInvite;
+	this->_cmdMap["TOPIC"] = &Server::handleTopic;
+	this->_cmdMap["MODE"] = &Server::handleMode;
 }
 
-Server::Server(const Server& other) : _serverName(other._serverName), _serverPass(other._serverPass), _cmdMap(other._cmdMap) {}
+Server::Server(const Server& other) : _cmdMap(other._cmdMap), _serverName(other._serverName), _serverPass(other._serverPass), _port(other._port), _listenFd(other._listenFd), _pollfds(other._pollfds), _fdToIndex(other._fdToIndex) {}
 
 Server&	Server::operator=(const Server& other) {
 	if (this != &other){
@@ -120,7 +120,7 @@ void	Server::setupSocket(){
 	sockaddr_in6 serverAddress;
 	memset(&serverAddress, 0, sizeof(serverAddress));
 	serverAddress.sin6_family = AF_INET6;
-	serverAddress.sin6_port = htons(6676);
+	serverAddress.sin6_port = htons(_port);
 	serverAddress.sin6_addr = in6addr_any;
 
 	if (bind(_listenFd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
@@ -149,7 +149,7 @@ void	Server::setupSocket(){
 
 void	Server::startServer(){
 	setupSocket();
-	std::cout << "Server listening on port 6676..." << std::endl;
+	std::cout << "Server listening on port " << _port << "..." << std::endl;
 
 	// Main loop
 	while (true) {
@@ -230,6 +230,7 @@ void	Server::acceptNewClients(){
 }
 
 void	Server::handleClientInput(int fd, size_t index){
+	(void)index;
 	std::vector<int> fdsToClose;
 	
 	while (true) {
@@ -274,6 +275,8 @@ void	Server::handleClientInput(int fd, size_t index){
 }
 
 void	Server::handleClientOutput(int fd, size_t index){
+	(void)fd;
+	(void)index;
 	// This method can be used later for buffered output if needed
 	// For now, we use direct send() calls in command handlers
 }

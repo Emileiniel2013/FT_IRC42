@@ -13,6 +13,7 @@
 #pragma once
 #include <string>
 #include <set>
+#include <vector>
 
 class	Channel{
 private:
@@ -26,6 +27,7 @@ private:
 	std::string		_pass;
 	int				_userLimit = 0;
 public:
+	Channel();
 	Channel(std::string	name);
 	Channel(const Channel& other);
 	Channel&	operator=(const Channel& other);

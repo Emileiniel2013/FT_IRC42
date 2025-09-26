@@ -29,6 +29,7 @@ private:
 	bool					_authenticated = false;
 	std::string				_inputBuf;
 public:
+	Client();
 	Client(int id);
 	Client(const Client& other);
 	Client&	operator=(const Client& other);
