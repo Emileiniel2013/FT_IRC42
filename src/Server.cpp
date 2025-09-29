@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 17:02:14 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/26 14:50:44 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/29 19:59:17 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,7 @@
 #include "ErrorCodes.hpp"
 #include <sstream>
 #include <vector>
+#include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -52,6 +53,12 @@ Server&	Server::operator=(const Server& other) {
 
 Server::~Server() {}
 
+void	Server::scheduleFdClose(int fd){
+	if (fd == _listenFd)
+		return; // never schedule listening socket here
+	_fdsToClose.insert(fd);
+}
+
 void	Server::sendError(Client& client, int errCode, const std::string& target, const std::string& text){
 	std::ostringstream oss;
 	oss << ":" << this->_serverName << " " << errCode << " "
@@ -60,6 +67,7 @@ void	Server::sendError(Client& client, int errCode, const std::string& target, c
 		oss << " " << target;
 	oss << " :" << text << "\r\n";
 	std::string	msg = oss.str();
+	std::cout << "Message to client " + std::to_string(client.getId()) + ": " + msg + "\n";
 	send(client.getId(), msg.c_str(), msg.size(), 0);
 }
 
@@ -72,7 +80,8 @@ void	Server::registerUser(Client& client){
 		return ;
 	client.setAuth(true);
 	std::string	msg = ":" + this->_serverName + " 001 " + client.getNick() + " :WELCOME TO THE GREEN AVENGERS IRC NETWORK, "
-		+ client.getNick() + "!" + client.getUser() + "@" + _serverName + "\r\n";
+		+ client.getPrefix() + "\r\n";
+	std::cout << "Message to client " + std::to_string(client.getId()) + ": " + msg + "\n";
 	send(client.getId(), msg.c_str(), msg.size(), 0);
 }
 
@@ -183,9 +192,21 @@ void	Server::startServer(){
 			}
 		}
 
-		// Clean up disconnected clients
-		for (int fd : fdsToClose) {
-			cleanupClient(fd);
+		// Merge local vector into global set
+		for (int fd : fdsToClose)
+			_fdsToClose.insert(fd);
+
+		// Process and clear global close set
+		if (!_fdsToClose.empty()) {
+			// copy to avoid iterator invalidation during cleanup
+			std::vector<int> toClose(_fdsToClose.begin(), _fdsToClose.end());
+			_fdsToClose.clear();
+			for (int fd : toClose) {
+				if (_clients.count(fd))
+					cleanupClient(fd);
+				else
+					close(fd); // stray fd still open
+			}
 		}
 	}
 
@@ -208,7 +229,7 @@ void	Server::acceptNewClients(){
 			perror("accept");
 			break;
 		}
-
+		
 		// Set client socket non-blocking
 		int clientFlags = fcntl(clientFd, F_GETFL, 0);
 		if (clientFlags == -1 || fcntl(clientFd, F_SETFL, clientFlags | O_NONBLOCK) == -1) {
@@ -217,6 +238,13 @@ void	Server::acceptNewClients(){
 			continue;
 		}
 
+		// Store client hostname (in this case it will most be default but whatever)
+		char	host_str[NI_MAXHOST];
+		std::string	clientHost = "unknown";
+		if (getnameinfo((struct sockaddr*)&clientAddr, clientLen, host_str, 
+				sizeof(host_str), NULL, 0, NI_NUMERICHOST) == 0)
+			clientHost = host_str;
+
 		// Add to pollfd vector
 		pollfd clientPfd = {clientFd, POLLIN, 0};
 		_pollfds.push_back(clientPfd);
@@ -224,6 +252,7 @@ void	Server::acceptNewClients(){
 
 		// Create new Client object
 		_clients[clientFd] = Client(clientFd);
+		_clients[clientFd].setHostname(clientHost);
 
 		std::cout << "New client connected: " << clientFd << std::endl;
 	}
@@ -233,7 +262,7 @@ void	Server::handleClientInput(int fd, size_t index){
 	(void)index;
 	std::vector<int> fdsToClose;
 	
-	while (true) {
+	while (!_clients[fd].getExit()) {
 		char buffer[1024];
 		ssize_t bytesRead = recv(fd, buffer, sizeof(buffer) - 1, 0);
 
@@ -252,6 +281,8 @@ void	Server::handleClientInput(int fd, size_t index){
 				
 				// Process the IRC command using existing handler
 				processInput(_clients[fd], message);
+				if (_clients[fd].getExit())
+					break ;
 			}
 		} else if (bytesRead == 0) {
 			// Client closed connection
@@ -268,9 +299,10 @@ void	Server::handleClientInput(int fd, size_t index){
 		}
 	}
 	
-	// Clean up any clients that disconnected during input handling
+	// Defer actual cleanup to main loop
 	for (int fdToClose : fdsToClose) {
-		cleanupClient(fdToClose);
+		if (fdToClose != _listenFd)
+			_fdsToClose.insert(fdToClose);
 	}
 }
 
@@ -290,7 +322,10 @@ void	Server::cleanupClient(int fd){
 		if (client.getAuth()) {
 			std::set<std::string> channels = client.getChannels();
 			for (auto it = channels.begin(); it != channels.end(); ++it) {
-				std::string msg = ":" + client.getPrefix() + " QUIT :Connection error\r\n";
+				std::string reason = "Connection error";
+				if (_quitReasons.count(fd))
+					reason = _quitReasons[fd];
+				std::string msg = ":" + client.getPrefix() + " QUIT :" + reason + "\r\n";
 				std::string chName = *it;
 				if (_channels.count(chName) == 0)
 					continue;
@@ -303,6 +338,7 @@ void	Server::cleanupClient(int fd){
 			}
 		}
 	}
+	_quitReasons.erase(fd);
 	
 	_clients.erase(fd);
 	size_t idx = _fdToIndex[fd];

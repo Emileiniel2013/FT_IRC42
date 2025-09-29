@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:57:21 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/26 14:00:13 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/29 19:51:34 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,6 +22,7 @@ Client::Client(const Client& other) {
 	_nick = other._nick;
 	_user = other._user;
 	_name = other._name;
+	_hostname = other._hostname;
 	_channels = other._channels;
 	_authenticated = other._authenticated;
 	_inputBuf = other._inputBuf;
@@ -33,6 +34,7 @@ Client&	Client::operator=(const Client& other){
 		_nick = other._nick;
 		_user = other._user;
 		_name = other._name;
+		_hostname = other._hostname;
 		_channels = other._channels;
 		_authenticated = other._authenticated;
 		_inputBuf = other._inputBuf;
@@ -54,7 +56,7 @@ std::string				Client::getReplyNick() const {
 }
 
 std::string				Client::getPrefix() const {
-	return getNick() + "!~" + getUser() + "@";
+	return getReplyNick() + "!" + getUser() + "@" + _hostname;
 }
 
 void					Client::setNick(const std::string& nick) {this->_nick = nick;}
@@ -64,6 +66,8 @@ const 	std::string&	Client::getUser() const {return this->_user;}
 
 const std::string&		Client::getName() const {return this->_name;}
 void					Client::setName(const std::string& name) {this->_name = name;}
+
+void					Client::setHostname(const std::string& host) {_hostname = host;}
 
 std::set<std::string>	Client::getChannels() const {return this->_channels;}
 void					Client::addChannel(const std::string& channel) {this->_channels.insert(channel);}
@@ -79,6 +83,9 @@ bool					Client::getAuth() const {return this->_authenticated;}
 void					Client::setAuth(bool b){
 	this->_authenticated = b;
 }
+
+void					Client::setExit(bool b) {this->_exit = b;}
+bool					Client::getExit(void) const {return this->_exit;}
 
 std::string&			Client::getInputBuf() {return this->_inputBuf;}
 

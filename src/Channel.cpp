@@ -6,13 +6,14 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:58:19 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/22 21:13:26 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/28 21:33:58 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Channel.hpp"
 #include <vector>
 #include <sys/socket.h>
+#include <iostream>
 
 Channel::Channel() : _name("") {}
 
@@ -120,6 +121,7 @@ int					Channel::getUserCount() const {return static_cast<int>(this->_members.si
 
 void				Channel::broadcast(const std::string& message) const{
 	for (int id : this->getAllMembers()){
+		std::cout << "Message to client " + std::to_string(id) + ": " + message + "\n";
 		send(id, message.c_str(), message.size(), 0);
 	}
 }

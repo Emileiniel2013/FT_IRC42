@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/26 14:33:56 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/26 14:49:43 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/29 19:50:11 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,7 @@
 #include <vector>
 #include <sys/socket.h>
 #include "ServerHelpers.hpp"
+#include <iostream>
 
 
 void	Server::handlePass(Client& client, std::istringstream& in) {
@@ -31,8 +32,10 @@ void	Server::handlePass(Client& client, std::istringstream& in) {
 		return ;
 	}
 	if (password != this->_serverPass){
-		sendError(client, ERR_PASSWDMISMATCH, "", "Password incorrect"); //HERE WE NEED TO DISCONNECT USER
-		_clients.erase(client.getId());
+		sendError(client, ERR_PASSWDMISMATCH, "", "Password incorrect");
+		_quitReasons[client.getId()] = "Password incorrect";
+		scheduleFdClose(client.getId());
+		client.setExit(true);
 		return ;
 	}
 	client.setPassOk(true);
@@ -51,8 +54,22 @@ void	Server::handleNick(Client& client, std::istringstream& in) {
 		sendError(client, ERR_NICKNAMEINUSE, nickname, "Nickname is already taken");
 		return ;
 	}
+	std::string	msg = ":" + client.getPrefix() + " NICK :" + nickname + "\r\n";
+	send (client.getId(), msg.c_str(), msg.size(), 0);
 	client.setNick(nickname);
 	client.setNickOk(true);
+	std::set<std::string>	channels = client.getChannels();
+	for (auto it = channels.begin(); it != channels.end(); ++it){
+		std::string	chName = *it;
+		if (_channels.count(chName) == 0)
+			continue ;
+		Channel&	ch = _channels[chName];
+		for (int id : ch.getAllMembers()){
+			if (id != client.getId()){
+				std::cout << "Message to client " + std::to_string(id) + ": " + msg + "\n";
+				send(id, msg.c_str(), msg.size(), 0);
+			}
+	}	}
 	registerUser(client);
 }
 
@@ -150,8 +167,8 @@ void	Server::handlePrivmsg(Client& client, std::istringstream& in) {
 			sendError(client, ERR_NOSUCHNICK, target, "No such nick");
 			return ;
 		}
-		std::string	msg = ":" + client.getPrefix() + 
-			" PRIVMSG " + target + " :" + message + "\r\n";
+		std::string	msg = ":" + client.getPrefix() + " PRIVMSG " + target + " :" + message + "\r\n";
+		std::cout << "Message to client " + std::to_string(getIdFromNick(target)) + ": " + msg + "\n";
 		send(getIdFromNick(target), msg.c_str(), msg.size(), 0);
 	}
 }
@@ -164,6 +181,7 @@ void	Server::handlePing(Client& client, std::istringstream& in) {
 		sendError(client, ERR_NOORIGIN, "PING", "No origin specified");
 	}
 	std::string	msg = ":" + this->_serverName + " PONG :" + token + "\r\n";
+	std::cout << "Message to client " + std::to_string(client.getId()) + ": " + msg + "\n";
 	send(client.getId(), msg.c_str(), msg.size(), 0);
 }
 
@@ -191,10 +209,10 @@ void	Server::handlePart(Client& client, std::istringstream& in) {
 			continue ;
 		}
 		std::string msg = ":" + client.getPrefix() + " PART " + chName + " :" + 
-			reason + "\r\n";
+		reason + "\r\n";
+		ch.broadcast(msg);
 		ch.removeMember(client.getId());
 		ch.removeOperator(client.getId());
-		ch.broadcast(msg);
 		client.remChannel(chName);
 		if (ch.getAllMembers().empty())
 			_channels.erase(chName);
@@ -207,21 +225,9 @@ void	Server::handleQuit(Client& client, std::istringstream& in) {
 	trimPrefix(reason);
 	if (reason.empty())
 		reason = client.getNick();
-	std::string	msg = ":" + client.getPrefix() + _serverName + " QUIT :" + reason + "\r\n";
-	std::set<std::string>	channels = client.getChannels();
-	for (auto it = channels.begin(); it != channels.end(); ++it){
-		std::string	chName = *it;
-		if (_channels.count(chName) == 0)
-			continue ;
-		Channel&	ch = _channels[chName];
-		ch.removeMember(client.getId());
-		ch.removeOperator(client.getId());
-		ch.broadcast(msg);
-		if (ch.getAllMembers().empty())
-			_channels.erase(chName);
-	}
-	int fd_to_close = client.getId(); // HERE WE NEED TO SEND THE FD TO THE SERVER SYSTEM THAT CLOSES THE FDS
-	_clients.erase(fd_to_close);
+	_quitReasons[client.getId()] = reason;
+	scheduleFdClose(client.getId());
+	client.setExit(true);
 }
 
 void	Server::handleKick(Client& client, std::istringstream& in) {
@@ -287,8 +293,8 @@ void	Server::handleInvite(Client& client, std::istringstream& in) {
 	}
 	if (ch.getInviteOnly())
 		ch.addInvite(getIdFromNick(targetName));
-	std::string	msg = ":" + client.getPrefix() + this->_serverName + 
-		" INVITE " + targetName + " :" + chName + "\r\n";
+	std::string	msg = ":" + client.getPrefix() + " INVITE " + targetName + " :" + chName + "\r\n";
+	std::cout << "Message to client " + std::to_string(getIdFromNick(targetName)) + ": " + msg + "\n";
 	send(getIdFromNick(targetName), msg.c_str(), msg.size(), 0);
 }
 
@@ -315,10 +321,12 @@ void	Server::handleTopic(Client& client, std::istringstream& in) {
 		if (ch.getTopic().empty()){
 			msg = ":" + this->_serverName + " 331 " + client.getReplyNick() + " " 
 				+ chName + " :No topic is set\r\n";
+			std::cout << "Message to client " + std::to_string(client.getId()) + ": " + msg + "\n";
 			send(client.getId(), msg.c_str(), msg.size(), 0);
 		}else {
 			msg = ":" + this->_serverName + " 332 " + client.getReplyNick() + " " 
 				+ chName + " :" + ch.getTopic() + "\r\n";
+			std::cout << "Message to client " + std::to_string(client.getId()) + ": " + msg + "\n";
 			send(client.getId(), msg.c_str(), msg.size(), 0);
 		}
 		return ;
@@ -338,6 +346,15 @@ void	Server::handleMode(Client& client, std::istringstream& in) {
 	in >> chName >> mode >> param;
 	if (chName.empty() || mode.empty()){
 		sendError(client, ERR_NEEDMOREPARAMS, "MODE", "Not enough parameters");
+		return ;
+	}
+	if (chName == client.getNick()){
+		if (!mode.empty())
+			sendError(client, ERR_UMODEUNKNOWNFLAG, mode, "Unknown MODE flag");
+		else{
+			std::string	msg = ":" + this->_serverName + " 221 " + client.getReplyNick() + " +\r\n"; 
+			send(client.getId(), msg.c_str(), msg.size(), 0);
+		}
 		return ;
 	}
 	if (_channels.count(chName) == 0){

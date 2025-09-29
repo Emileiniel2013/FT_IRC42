@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/26 15:00:00 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/26 15:00:00 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/26 19:31:35 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
 
     try {
         int port = std::stoi(argv[1]);
-        Server server("IRCServer", argv[2], port);
+        Server server("irc.greenavengers.42", argv[2], port);
         server.startServer();
     } catch (const std::exception& e) {
         std::cerr << "Server error: " << e.what() << std::endl;

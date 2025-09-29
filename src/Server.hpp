@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 17:01:07 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/26 14:49:25 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/29 19:40:04 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,7 @@
 #include <vector>
 #include <unordered_map>
 #include <poll.h>
+#include <set>
 
 class	Server{
 public:
@@ -40,6 +41,8 @@ private:
 	int										_listenFd;
 	std::vector<pollfd>						_pollfds;
 	std::unordered_map<int, size_t>			_fdToIndex;
+	std::set<int>							_fdsToClose; // fds pending closure
+	std::map<int, std::string>				_quitReasons; // quit reasons captured before cleanup
 
 
 	void	createChannel(Client& creator, const std::string& chName);
@@ -64,11 +67,11 @@ private:
 	void	handleJoin(Client& client, std::istringstream& str);
 	void	handlePrivmsg(Client& client, std::istringstream& str);
 	void	handlePing(Client& client, std::istringstream& str);
-	void	handlePong(Client& client, std::istringstream& str);
 	void	handlePart(Client& client, std::istringstream& str);
 	void	handleQuit(Client& client, std::istringstream& str);
 	void	handleKick(Client& client, std::istringstream& str);
 	void	handleInvite(Client& client, std::istringstream& str);
 	void	handleTopic(Client& client, std::istringstream& str);
 	void	handleMode(Client& client, std::istringstream& str);
+	void	scheduleFdClose(int fd);
 };

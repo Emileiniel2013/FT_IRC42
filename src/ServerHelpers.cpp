@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/17 22:55:59 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/26 14:51:19 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/29 17:52:13 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 #include "ServerHelpers.hpp"
 #include <sstream>
 #include <sys/socket.h>
+#include <iostream>
 
 std::vector<std::string>	split(const std::string& str, char delim){
 	std::vector<std::string>	res;
@@ -44,8 +45,7 @@ void	Server::createChannel(Client& creator, const std::string& chName){
 
 
 void	Server::broadcastJoin(Client& client, Channel& ch) {
-	std::string	msg = ":" + client.getPrefix() +
-		" JOIN :" + ch.getName() + "\r\n";
+	std::string	msg = ":" + client.getPrefix() + " JOIN " + ch.getName() + "\r\n";
 	ch.broadcast(msg);
 }
 
@@ -54,11 +54,13 @@ void	Server::sendTopic(Client& client, Channel& ch){
 	if (!ch.getTopic().empty()){
 		msg = ":" + this->_serverName + " 332 " + client.getReplyNick() +
 			" " + ch.getName() + " :" + ch.getTopic() + "\r\n";
+		std::cout << "Message to client " + std::to_string(client.getId()) + ": " + msg + "\n";
 		send(client.getId(), msg.c_str(), msg.size(), 0);
 	}
 	else{
 		msg = ":" + this->_serverName + " 331 " + client.getReplyNick() +
 			" " + ch.getName() + " :No topic is set\r\n";
+		std::cout << "Message to client " + std::to_string(client.getId()) + ": " + msg + "\n";
 		send(client.getId(), msg.c_str(), msg.size(), 0);
 	}
 }
@@ -75,18 +77,22 @@ void	Server::sendNames(Client& client, Channel& ch){
 		namesList.pop_back();
 	std::string	msg = ":" + this->_serverName + " 353 " + client.getReplyNick() + 
 	" = " + ch.getName() + " :" + namesList + "\r\n";
+	std::cout << "Message to client " + std::to_string(client.getId()) + ": " + msg + "\n";
 	send(client.getId(), msg.c_str(), msg.size(), 0);
 	msg = ":" + this->_serverName + " 366 " + client.getReplyNick() + 
 	" = " + ch.getName() + " :End of NAMES list\r\n";
+	std::cout << "Message to client " + std::to_string(client.getId()) + ": " + msg + "\n";
 	send(client.getId(), msg.c_str(), msg.size(), 0);
 }
 
 void	Server::broadcastMessage(Client& sender, Channel& ch, const std::string& message){
 	std::string	msg = ":" + sender.getPrefix() + 
-			" PRIVMSG " + ch.getName() + " :" + message + "\r\n";
+		" PRIVMSG " + ch.getName() + " :" + message + "\r\n";
 	for (int id : ch.getAllMembers()){
-		if (id != sender.getId())
+		if (id != sender.getId()) {
+		std::cout << "Message to client " + std::to_string(id) + ": " + msg + "\n";
 			send(id, msg.c_str(), msg.size(), 0);
+		}
 	}
 }
 

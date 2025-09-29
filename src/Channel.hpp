@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 14:58:29 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/22 21:13:11 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/29 16:23:16 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,7 +23,7 @@ private:
 	std::string		_topic;
 	bool			_inviteOnly = false;
 	std::set<int>	_invited;
-	bool			_topicRestrict = false;
+	bool			_topicRestrict = true;
 	std::string		_pass;
 	int				_userLimit = 0;
 public:

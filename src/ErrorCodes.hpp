@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/22 15:15:19 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/22 17:14:31 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/28 20:41:21 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,3 +30,4 @@
 #define ERR_INVITEONLYCHAN 473
 #define ERR_BADCHANNELKEY 475
 #define ERR_CHANOPRIVSNEEDED 482
+#define ERR_UMODEUNKNOWNFLAG 501

@@ -6,7 +6,7 @@
 /*   By: temil-da <temil-da@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/14 19:03:44 by temil-da          #+#    #+#             */
-/*   Updated: 2025/09/26 13:59:34 by temil-da         ###   ########.fr       */
+/*   Updated: 2025/09/29 19:51:07 by temil-da         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,11 +22,13 @@ private:
 	std::string				_nick;
 	std::string				_user;
 	std::string				_name;
+	std::string				_hostname;
 	std::set<std::string>	_channels;
 	bool					_passOk = false;
 	bool					_nickOk = false;
 	bool					_userOk = false;
 	bool					_authenticated = false;
+	bool					_exit = false;
 	std::string				_inputBuf;
 public:
 	Client();
@@ -46,6 +48,7 @@ public:
 	void					setUser(const std::string& user);
 	const std::string&		getName() const;
 	void					setName(const std::string& name);
+	void					setHostname(const std::string& host);
 	std::set<std::string>	getChannels() const;
 	void					addChannel(const std::string& channel);
 	void					remChannel(const std::string& channel);
@@ -57,6 +60,8 @@ public:
 	bool					getUserOk() const;
 	bool					getAuth() const;
 	void					setAuth(bool b);
+	void					setExit(bool b);
+	bool					getExit(void) const;
 	std::string&			getInputBuf();
 	void					appendInputBuf(const std::string& data);
 	void					eraseFromInputBuf(size_t count);
